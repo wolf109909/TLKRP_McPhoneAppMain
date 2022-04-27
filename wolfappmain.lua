@@ -199,7 +199,7 @@ local w,h = 256,256
 net.Receive("wolfapp.FUFUTaxiServerResponce",function(l)
     FUFUTaxi_Result = net.ReadString()
     FUFUTaxi_Driver = net.ReadEntity()
-    LocalPlayer():ConCommand( "say /ooc [debug]:" .. FUFUTaxi_Result )
+    --LocalPlayer():ConCommand( "say /ooc [debug]:" .. FUFUTaxi_Result )
 end)
 
 
