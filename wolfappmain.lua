@@ -10,6 +10,10 @@
 -- Phone app made for TLK RP server
 -- some code is from original stormfox2 module.
 
+
+-- Put shared functions here
+
+-- End shared functions
 if SERVER then
     
     util.AddNetworkString("wolfapp.CallRandomCpStart")
@@ -19,14 +23,18 @@ if SERVER then
     util.AddNetworkString("wolfapp.FUFUTaxiServerResponce")
     util.AddNetworkString("wolfapp.FUFUTaxiSendCancelRequest")
 
-    net.Receive("FUFUTaxiSendCancelRequest", function(len, player)
+    net.Receive("wolfapp.FUFUTaxiSendCancelRequest", function(len, player)
         -- ply is the player who cancels the request
+        print("Cancelling request")
+        
         for k,v in pairs(FUFU.Taxi.Requests) do
-            if v.by == player then
+            if v.by == nil or v.taken_by == nil or v.by == player or v.taken_by == player then
+                print("Found request")
                 FUFU.Taxi.Requests[k] = nil
             end
-
+    
         end
+        PrintTable(FUFU.Taxi.Requests)
     end)
 
     net.Receive("wolfapp.FUFUTaxiSendRequest",function(l,pPlayer)
@@ -225,15 +233,70 @@ local function FUFUTaxi_Page_DrawStatus(status,str)
     end
 
 end
+local function FUFUTaxi_Page_DrawSuccess(str)
+    McPhone.UI.Menu:Clear(true)
+    McPhone.UI.Menu.ConvertToList()
+    local bg = FUFU.Taxi.Config.Colors["secondary"]
+    local rc = Color(55, 55, 255, 55)
+    local ca = Color(255, 255, 255, 8)
+    local frame = vgui.Create("DPanel")
 
-function wolfapp_Fufutaxi_CancelRequest()
-    net.Start("wolfapp.FUFUTaxiSendCancelRequest")
-    net.SendToServer()
-    FUFUTaxi_Page_DrawStatus(true ,"出租车请求已取消!")
+    frame:SetSize(256, 256)
+    frame:SetDisabled(true)
+    frame:SetAlpha(255)
+
+    frame.Paint = function(self, w, h)
+        McPhone.UI.OpenedMenu = "取消订单"
+        
+        local intW, intH = 64,64
+        FUFUTaxi_Page_DrawBackGround()
+        local mat = Material("fufu_taxi/correct.png")
+        surface.SetDrawColor(color_white)
+        surface.SetMaterial(mat)
+        surface.DrawTexturedRect(w/2-intW/2,h/2 - intH/2 - math.sin(CurTime() * 3) * 10 - 20,intW,intH)
+        draw.DrawText(str, "FUFU:Taxi:24", 128, 150, zrush.default_colors["green"], TEXT_ALIGN_CENTER)
+        
+        
+        
+        
+        
+    end
+    McPhone.UI.Menu:AddItem(frame)
 end
 
 
+function wolfapp_Fufutaxi_CancelRequest()
+    McPhone.UI.GoBack = print("")
+    net.Start("wolfapp.FUFUTaxiSendCancelRequest")
+    net.SendToServer()
+    timer.Simple(3,function()
+        wolfapp_Menu()
+    end)
+    FUFUTaxi_Page_DrawSuccess("出租车请求已取消!\n芙芙将在3秒后返回主菜单")
+
+end
+
+function wolfapp_Fufutaxi_Welcome()
+    local intW, intH = 64,64
+    local mat = Material("fufu_taxi/call-center.png")
+    FUFUTaxi_Page_DrawBackGround()
+    surface.SetDrawColor(color_white)
+    surface.SetMaterial(mat)
+    surface.DrawTexturedRect(w/2-intW/2,h/2 - intH/2 - math.sin(CurTime() * 3) * 10 - 20,intW,intH)
+    
+    
+    draw.DrawText("欢迎使用芙芙打车!\n将在3秒后开始叫车!", "FUFU:Taxi:24", 128, 150, zrush.default_colors["white01"], TEXT_ALIGN_CENTER)
+
+end
+
 function wolfapp_Fufutaxi_Menu()
+    McPhone.UI.Buttons.Left = {nil, nil, nil}
+    McPhone.UI.Buttons.Middle = {nil, nil, nil}
+    McPhone.UI.Buttons.Right = {nil, nil, nil}
+    McPhone.UI.GoBack = function()
+        wolfapp_Fufutaxi()
+    end
+
     McPhone.UI.Menu.ConvertToList()
         
     McPhone.UI.Menu:Clear(true)
@@ -242,12 +305,27 @@ function wolfapp_Fufutaxi_Menu()
         
         wolfapp_Fufutaxi_CancelRequest()
         
+        
     end)
 end
 function wolfapp_Fufutaxi()
-    McPhone.UI.GoBack = wolfAppBackFunc
+    McPhone.UI.Buttons.Left = {nil, nil, nil}
+    McPhone.UI.Buttons.Right = {"mc_phone/icons/buttons/id4.png", McPhone.MainColors["green"], function()
+        wolfapp_Fufutaxi_Menu()
+        
+    
+    end}
+    McPhone.UI.Buttons.Middle = {nil, nil, nil}
+
+    timer.Create("FUFUTaxi_Welcome", 3, 1, function()
+        FUFUTaxi_ClientRequestTaxi()
+    end)
+    McPhone.UI.GoBack = function()
+        timer.Destroy("FUFUTaxi_Welcome")
+        wolfapp_Menu()
+    end
     --FUFUTaxi_IsTaxiAppOpen = true 
-    FUFUTaxi_Result = 0
+    FUFUTaxi_Result = "0"
     
     
     McPhone.UI.Menu:Clear(true)
@@ -260,27 +338,24 @@ function wolfapp_Fufutaxi()
     frame:SetSize(256, 256)
     frame:SetDisabled(true)
     frame:SetAlpha(255)
-    McPhone.UI.Buttons.Middle = {"mc_phone/icons/buttons/id4.png", McPhone.MainColors["green"], function()
-        wolfapp_Fufutaxi_Menu()
-        McPhone.UI.GoBack = function()
-            wolfapp_Fufutaxi()
-        end
     
-    end}
    	PrintTable(McPhone.Config.GPSList[game.GetMap()])
-    FUFUTaxi_ClientRequestTaxi()
+    
     frame.Paint = function(self, w, h)
         
         McPhone.UI.OpenedMenu = "芙芙打车"
-        
-        if FUFUTaxi_Result == "0" or FUFUTaxi_Result == "3" then
-            FUFUTaxi_Page_CallingTaxi()
+        --print(FUFUTaxi_Result)
+        if FUFUTaxi_Result == "0" then
+            wolfapp_Fufutaxi_Welcome()
         end
         if FUFUTaxi_Result == "1" then
             FUFUTaxi_Page_DrawStatus(false,FUFU.Taxi:GetLanguage("player_can"))
         end
         if FUFUTaxi_Result == "2" then
             FUFUTaxi_Page_DrawStatus(false,FUFU.Taxi:GetLanguage("already_request"))
+        end
+        if FUFUTaxi_Result == "3" then
+            FUFUTaxi_Page_CallingTaxi()
         end
         if FUFUTaxi_Result == "4" then
             FUFUTaxi_Page_DrawStatus(true,"呼叫成功,请等待司机到达！")
