@@ -185,9 +185,354 @@ if SERVER then
 end
 
 if SERVER then return end
+local function wolfapp_GetErrorStringFromCode(errcode)
+    if errcode == 1 then
+        return "参数错误"
+    elseif errcode == 2 then
+        return "数据库错误"
+    elseif errcode == 3 then
+        return "权限错误"
+    elseif errcode == 4 then
+        return "未知错误"
+    elseif errcode == 5 then
+        return "沒有數據"
+    else
+        return "未知错误:"..errcode
+    end
+end
 
+local function wolfapp_Generic_Error(errcode)
+    McPhone.UI.Menu:Clear(true)
+    McPhone.UI.Menu.ConvertToList()
+    local bg = FUFU.Taxi.Config.Colors["secondary"]
+    local rc = Color(55, 55, 255, 55)
+    local ca = Color(255, 255, 255, 8)
+    local frame = vgui.Create("DPanel")
+
+    frame:SetSize(256, 256)
+    frame:SetDisabled(true)
+    frame:SetAlpha(255)
+
+    frame.Paint = function(self, w, h)
+        local intW, intH = 64,64
+        FUFUTaxi_Page_DrawBackGround()
+        
+        
+        local mat = Material("fufu_taxi/error.png")
+        
+        surface.SetDrawColor(color_white)
+        surface.SetMaterial(mat)
+        surface.DrawTexturedRect(w/2-intW/2,h/2 - intH/2 - math.sin(CurTime() * 3) * 10 - 20,intW,intH)
+        draw.DrawText(wolfapp_GetErrorStringFromCode(errcode), "FUFU:Taxi:24", 128, 150, zrush.default_colors["red01"], TEXT_ALIGN_CENTER)
+    end    
+    McPhone.UI.Menu:AddItem(frame)
+end
+
+local function wolfapp_Delivery_InitLocalFoodSelect()
+    wolfapp_Delivery_FoodSelect = wolfapp_Delivery_FoodSelect or {}
+end
+
+local function wolfapp_Generic_Loading()
+
+end
+local function wolfapp_Delivery_ParseFoodList(response)
+    local responsetable = util.JSONToTable(response)
+    if responsetable.status != 0 then 
+        wolfapp_Generic_Error(responsetable.status)
+    return end
+
+
+    wolfapp_Delivery_FoodList = responsetable.result
+end
+
+
+local function wolfapp_Delivery_GetFoodList()
+    wolfapp_Delivery_FoodList = {}
+    wolfapp_Test_HTTP_Loading()
+
+ http.Fetch("https://我好喜欢小曲奇",function(body)
+    wolfapp_Delivery_ParseFoodList(body)
+ end,function(error)
+    wolfapp_Generic_Error(error)
+ end,{
+     ["Content-Type"] = "application/json"
+ })
+end
 --CLIENT SECTION
 --REGISTER YOUR CLIENT FUNCTIONS HERE
+local function drawScrSpaceText(text, x, y, mx, color, parent)
+	local font = "McPhone.Main18"
+	surface.SetFont(font)
+	local w = surface.GetTextSize(text)
+
+	if w + x > mx then
+		if parent then
+			if parent.text_dir and isnumber(parent.text_dir) and parent.text_dir < CurTime() then
+				parent.text_dir = nil
+			end
+
+			if parent.text_pos > mx - w - (10 + x) and not parent.text_dir then
+				parent.text_pos = math.Approach(parent.text_pos, mx - w - (10 + x), FrameTime() * 50)
+			else
+				if parent.text_pos >= 0 and not isnumber(parent.text_dir) then
+					parent.text_dir = CurTime() + 2
+				else
+					parent.text_pos = math.Approach(parent.text_pos, 0, FrameTime() * 50)
+				end
+
+				if not parent.text_dir then
+					parent.text_dir = true
+				end
+			end
+
+			local sx, sy = parent:LocalToScreen(x, 0)
+			render.SetScissorRect(sx, sy, sx + (mx - x), sy + parent:GetTall(), true)
+			draw.SimpleText(text, font, x + parent.text_pos, y, color, TEXT_ALIGN_LEFT)
+			render.SetScissorRect(0, 0, 0, 0, false)
+
+			return
+		else
+			font = "McPhone.Main18"
+			y = y + 3
+		end
+	end
+
+	draw.SimpleText(text, font, x, y, color, TEXT_ALIGN_LEFT)
+end
+function wolfapp_Delivery_UI_ListFood(parent, icon, text, check, func, ignore, snd, supress, foodid )
+    if wolfapp_Delivery_FoodList == nil then return end
+	local icon_nohover, icon_url
+    local currentfoodamount = 
+	if istable(icon) then
+		icon_nohover = icon[2]
+		icon_url = icon[3]
+		icon = icon[1]
+	end
+    
+    local plusbtn = vgui.Create("DButton", buton)
+    plusbtn:SetSize(24, 24)
+    plusbtn:SetText("+")
+    parent:AddItem(plusbtn)
+
+    local quantitybtn = vgui.Create("DButton", buton)
+    plusbtn:SetSize(24, 24)
+    plusbtn:SetText("+")
+    parent:AddItem(plusbtn)
+
+    local minusbtn = vgui.Create("DButton", buton)
+    minusbtn:SetSize(24, 24)
+    minusbtn:SetText("-")
+    parent:AddItem(minusbtn)
+
+	local buton = vgui.Create("DButton")
+	buton.icon = icon
+	buton.check = check
+	buton:SetSize(180, 25)
+	buton:SetText("")
+	buton.text_pos = 0
+	buton.text_dir = CurTime() + 2
+
+	buton.DoClick = function(self)
+		if not snd then
+			McPhone.PlaySoundUI("mc_phone/open_1.wav")
+		end
+
+		if func then
+			func(self)
+		end
+
+		if McPhone.UI and not ignore then
+			McPhone.UI.OpenedMenu = text
+		end
+
+		return supress
+	end
+
+	buton.Paint = function(self, w, h)
+		if self.check then
+			icon = "mc_phone/icons/settings/id_9.png"
+		elseif icon ~= buton.icon then
+			icon = buton.icon
+		end
+
+		if self.hover then
+			draw.RoundedBox(0, 0, 0, w, h, McPhone.UserCfg.Theme["buttons"])
+
+			if isstring(icon) and not icon_nohover then
+				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_white)
+			end
+
+			drawScrSpaceText(text, 25, 3, w, color_white, self)
+		else
+			if isstring(icon) and not icon_nohover then
+				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_black)
+			end
+
+			drawScrSpaceText(text, 25, 3, w, color_black, self)
+		end
+
+		if icon_nohover then
+			McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_white)
+		end
+
+		draw.RoundedBox(0, 0, h - 3, w, 3, McPhone.MainColors.shadow_100)
+	end
+
+	buton.OnCursorEntered = function(self, mute)
+		if not mute and not snd then
+			McPhone.PlaySoundUI("mc_phone/click.wav")
+		end
+
+		if snd then
+			if snd == "snd" then
+				McPhone.StopSound()
+			else
+				McPhone.PlaySound(snd)
+			end
+		end
+
+		self.hover = true
+
+		for k, v in pairs(parent:GetItems()) do
+			if v == self then continue end
+			v:OnCursorExited()
+		end
+	end
+
+	buton.OnCursorExited = function(self)
+		self.hover = false
+	end
+
+
+
+	if not isstring(icon) then
+		local avatar = vgui.Create("AvatarImage", buton)
+		avatar:SetSize(32, 32)
+		avatar:SetPos(5, 10)
+		avatar:SetPlayer(icon, 32)
+	end
+
+	parent:AddItem(buton)
+
+	return buton
+end
+function McPhone.WolfappListIcons(parent, icon, text, check, func, ignore, snd, supress)
+	local icon_nohover, icon_url
+
+	if istable(icon) then
+		icon_nohover = icon[2]
+		icon_url = icon[3]
+		icon = icon[1]
+	end
+    
+    local plusbtn = vgui.Create("DButton", buton)
+    plusbtn:SetSize(24, 24)
+    plusbtn:SetText("+")
+    parent:AddItem(plusbtn)
+
+    local quantitybtn = vgui.Create("DButton", buton)
+    plusbtn:SetSize(24, 24)
+    plusbtn:SetText("+")
+    parent:AddItem(plusbtn)
+
+    local minusbtn = vgui.Create("DButton", buton)
+    minusbtn:SetSize(24, 24)
+    minusbtn:SetText("-")
+    parent:AddItem(minusbtn)
+
+	local buton = vgui.Create("DButton")
+	buton.icon = icon
+	buton.check = check
+	buton:SetSize(180, 25)
+	buton:SetText("")
+	buton.text_pos = 0
+	buton.text_dir = CurTime() + 2
+
+	buton.DoClick = function(self)
+		if not snd then
+			McPhone.PlaySoundUI("mc_phone/open_1.wav")
+		end
+
+		if func then
+			func(self)
+		end
+
+		if McPhone.UI and not ignore then
+			McPhone.UI.OpenedMenu = text
+		end
+
+		return supress
+	end
+
+	buton.Paint = function(self, w, h)
+		if self.check then
+			icon = "mc_phone/icons/settings/id_9.png"
+		elseif icon ~= buton.icon then
+			icon = buton.icon
+		end
+
+		if self.hover then
+			draw.RoundedBox(0, 0, 0, w, h, McPhone.UserCfg.Theme["buttons"])
+
+			if isstring(icon) and not icon_nohover then
+				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_white)
+			end
+
+			drawScrSpaceText(text, 25, 3, w, color_white, self)
+		else
+			if isstring(icon) and not icon_nohover then
+				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_black)
+			end
+
+			drawScrSpaceText(text, 25, 3, w, color_black, self)
+		end
+
+		if icon_nohover then
+			McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_white)
+		end
+
+		draw.RoundedBox(0, 0, h - 3, w, 3, McPhone.MainColors.shadow_100)
+	end
+
+	buton.OnCursorEntered = function(self, mute)
+		if not mute and not snd then
+			McPhone.PlaySoundUI("mc_phone/click.wav")
+		end
+
+		if snd then
+			if snd == "snd" then
+				McPhone.StopSound()
+			else
+				McPhone.PlaySound(snd)
+			end
+		end
+
+		self.hover = true
+
+		for k, v in pairs(parent:GetItems()) do
+			if v == self then continue end
+			v:OnCursorExited()
+		end
+	end
+
+	buton.OnCursorExited = function(self)
+		self.hover = false
+	end
+
+
+
+	if not isstring(icon) then
+		local avatar = vgui.Create("AvatarImage", buton)
+		avatar:SetSize(32, 32)
+		avatar:SetPos(5, 10)
+		avatar:SetPlayer(icon, 32)
+	end
+
+	parent:AddItem(buton)
+
+	return buton
+end
+
 FUFU.Taxi.IsTaxiAppPresent = true
 
 
@@ -490,7 +835,7 @@ function wolfapp_Test_HTTP_Success()
     for k,v in pairs(wolfapp_Test_HttpResponse_Table) do
         local name = wolfapp_Test_HttpResponse_Table[k].name
         
-        McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
+        McPhone.WolfappListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
                 wolfapp_Test_HttpResponse_DrawResult(k)
                 McPhone.UI.GoBack = wolfapp_Menu
                 
