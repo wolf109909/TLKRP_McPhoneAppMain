@@ -481,33 +481,42 @@ net.Receive("wolfapp.CallRandomCpFailed",function(l)
     McPhone.StopSound()
     drawFailure()
 end)
-
--- Test page for example
-function wolfapp_Test()
-    if SERVER then return end
-    
-
-    McPhone.UI.Menu:Clear(true)
+function wolfapp_Test_HTTP_Success()
+    McPhone.StopSound()
+    McPhone.UI.GoBack = wolfAppBackFunc
     McPhone.UI.Menu.ConvertToList()
-    local bg = Color(26, 41, 72, 255)
-    local rc = Color(55, 55, 255, 55)
-    local ca = Color(255, 255, 255, 8)
-    local frame = vgui.Create("DPanel")
 
+-- Menu Item list -- 
+    for k,v in pairs(wolfapp_Test_HttpResponse_Table) do
+        local name = wolfapp_Test_HttpResponse_Table[k].name
+        
+        McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
+                wolfapp_Test_HttpResponse_DrawResult(k)
+                McPhone.UI.GoBack = wolfapp_Menu
+                
+        end)
+        
+    end
+end
+function wolfapp_Test_HTTP_Loading()
+    McPhone.UI.Menu:Clear(true)
+    local bg = Color(26, 41, 72, 255)
+    
+    local frame = vgui.Create("DPanel")
     frame:SetSize(256, 256)
     frame:SetDisabled(true)
     frame:SetAlpha(255)
     
-   	PrintTable(McPhone.Config.GPSList[game.GetMap()])
-    
+   	
     frame.Paint = function(self, w, h)
-        McPhone.UI.OpenedMenu = "测试"
+        
         surface.SetDrawColor(bg)
     	surface.DrawRect(0, 0, w, h)    
     	
-          
+
         
-        draw.DrawText("Hello World!", "zrush_npc_font03", 128, 128, zrush.default_colors["white01"], TEXT_ALIGN_CENTER)
+        draw.DrawText("loading...", "zrush_npc_font03", 128, 20, zrush.default_colors["red01"], TEXT_ALIGN_CENTER)
+
         
         
         
@@ -515,8 +524,67 @@ function wolfapp_Test()
         
     end
     McPhone.UI.Menu:AddItem(frame)
+end
+
+function wolfapp_Test_HttpResponse_DrawResult(k)
+    server = wolfapp_Test_HttpResponse_Table[k]
+    PrintTable(server)
+    McPhone.UI.Menu:Clear(true)
+    local bg = Color(77, 93, 145)
+    local rc = Color(55, 55, 255, 55)
+    local ca = Color(255, 255, 255, 8)
+    McPhone.UI.OpenedMenu = "测试"
+    McPhone.UI.Menu.ConvertToList()
+    local frame = vgui.Create("DPanel")
+    frame:SetSize(256, 256)
+    frame:SetDisabled(true)
+    frame:SetAlpha(255)
+    local height = 0
+    local isDrawComplete = false
+    frame.Paint = function(self, w, h)
+        McPhone.UI.OpenedMenu = "测试"
+        surface.SetDrawColor(bg)
+    	surface.DrawRect(0, 0, w, h)    
+    	
+        
+            for k,v in pairs(server) do
+                if k != "modInfo" then
+                    --print(tostring(k)..":"..tostring(v))
+                    draw.DrawText(tostring(k)..":"..tostring(v), "zrush_npc_font03", 0, 0 + height, zrush.default_colors["white01"], TEXT_ALIGN_LEFT)
+                    height = height + 16
+                end
+            end
+
+            height = 0
+        
+        
+        
+        
+    end
+    McPhone.UI.Menu:AddItem(frame)
     
+end
+-- Test page for example
+function wolfapp_Test()
+    if SERVER then return end
+    wolfapp_Test_Selection = "none"
+    McPhone.UI.OpenedMenu = "Test"
+    McPhone.UI.Menu:Clear(true)
+    McPhone.UI.Menu.ConvertToList()
     
+    wolfapp_Test_HTTP_Loading()
+   	--PrintTable(McPhone.Config.GPSList[game.GetMap()])
+    http.Fetch("https://northstar.tf/client/servers",function(body)
+        
+        wolfapp_Test_HttpResponse_Table = util.JSONToTable( body )
+        wolfapp_Test_HTTP_Success()
+    end,function(error)
+        print(error)
+    end,{
+        ["Content-Type"] = "application/json"
+    })
+
+
         
         
 end
