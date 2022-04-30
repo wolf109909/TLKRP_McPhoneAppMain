@@ -185,6 +185,122 @@ if SERVER then
 end
 
 if SERVER then return end
+
+function wolfapp_PublicFund_HTTP_Success()
+    McPhone.StopSound()
+    McPhone.UI.GoBack = wolfAppBackFunc
+    McPhone.UI.Menu.ConvertToList()
+    PrintTable(wolfapp_PublicFund_HttpResponse_Table.Company)
+-- Menu Item list -- 
+    for k,v in pairs(wolfapp_PublicFund_HttpResponse_Table.Company) do
+        local name = v.Company_Name
+        PrintTable(wolfapp_PublicFund_HttpResponse_Table.Company)
+        McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
+                wolfapp_PublicFund_HttpResponse_DrawResult(v)
+                McPhone.UI.GoBack = wolfAppBackFunc
+                
+        end)
+        
+    end
+end
+
+
+function wolfapp_PublicFund_HTTP_Loading()
+    McPhone.UI.Menu:Clear(true)
+    local bg = Color(26, 41, 72, 255)
+    
+    local frame = vgui.Create("DPanel")
+    frame:SetSize(256, 256)
+    frame:SetDisabled(true)
+    frame:SetAlpha(255)
+    
+   	
+    frame.Paint = function(self, w, h)
+        
+        surface.SetDrawColor(bg)
+    	surface.DrawRect(0, 0, w, h)    
+    	
+
+        
+        draw.DrawText("loading...", "zrush_npc_font03", 128, 20, zrush.default_colors["red01"], TEXT_ALIGN_CENTER)
+
+        
+        
+        
+        
+        
+    end
+    McPhone.UI.Menu:AddItem(frame)
+end
+
+function wolfapp_PublicFund_HttpResponse_DrawResult(object)
+    
+    PrintTable(object)
+    McPhone.UI.Menu:Clear(true)
+    local bg = Color(77, 93, 145)
+    local rc = Color(55, 55, 255, 55)
+    local ca = Color(255, 255, 255, 8)
+    McPhone.UI.OpenedMenu = "公款查询"
+    McPhone.UI.Menu.ConvertToList()
+    local frame = vgui.Create("DPanel")
+    frame:SetSize(256, 256)
+    frame:SetDisabled(true)
+    frame:SetAlpha(255)
+    local height = 0
+    local isDrawComplete = false
+    frame.Paint = function(self, w, h)
+        McPhone.UI.OpenedMenu = "公款查询"
+        surface.SetDrawColor(bg)
+    	surface.DrawRect(0, 0, w, h)    
+    	draw.DrawText("该公司拥有公款:"..tostring(object.PublicFund), "zrush_npc_font03", 0, 0 + height, zrush.default_colors["white01"], TEXT_ALIGN_CENTER)
+
+        
+        
+        
+        
+    end
+    McPhone.UI.Menu:AddItem(frame)
+    
+end
+
+function wolfapp_PublicFund()
+    if SERVER then return end
+    wolfapp_PublicFund_Selection = "none"
+    McPhone.UI.OpenedMenu = "PublicFund"
+    McPhone.UI.Menu:Clear(true)
+    McPhone.UI.Menu.ConvertToList()
+    
+    wolfapp_PublicFund_HTTP_Loading()
+   	--PrintTable(McPhone.Config.GPSList[game.GetMap()])
+    http.Fetch("https://wolf109909server.ga:63001/api/company/query.php",function(body)
+        
+        wolfapp_PublicFund_HttpResponse_Table = util.JSONToTable( body )
+        wolfapp_PublicFund_HTTP_Success()
+    end,function(error)
+        print(error)
+    end,{
+        ["Content-Type"] = "application/json"
+    })
+
+
+        
+        
+end
+
+local function wolfapp_PublicFund_Main()
+
+end
+
+local function wolfapp_Delivery_GetFoodDesc(id)
+    if wolfapp_Delivery_FoodList == nil then
+        return 
+    end
+    --PrintTable(wolfapp_Delivery_FoodList)
+
+    return wolfapp_Delivery_FoodList[id].Food_Description
+end
+
+
 local function wolfapp_GetErrorStringFromCode(errcode)
     if errcode == 1 then
         return "参数错误"
@@ -228,35 +344,64 @@ local function wolfapp_Generic_Error(errcode)
     McPhone.UI.Menu:AddItem(frame)
 end
 
-local function wolfapp_Delivery_InitLocalFoodSelect()
+function wolfapp_Delivery_InitLocalFoodSelect()
     wolfapp_Delivery_FoodSelect = wolfapp_Delivery_FoodSelect or {}
 end
 
 local function wolfapp_Generic_Loading()
-
+    
 end
-local function wolfapp_Delivery_ParseFoodList(response)
+function wolfapp_Delivery_ParseFoodList(response)
     local responsetable = util.JSONToTable(response)
     if responsetable.status != 0 then 
         wolfapp_Generic_Error(responsetable.status)
     return end
-
+    --PrintTable(responsetable)
 
     wolfapp_Delivery_FoodList = responsetable.result
+    wolfapp_Delivery_DrawFoodSelectionMenu()
+end
+function wolfapp_Delivery_UpdateFoodSelectionMenu()
+    McPhone.UI.Menu:Clear(true)
+    for k,v in pairs(wolfapp_Delivery_FoodList) do
+        local name = v.Food_Name
+        local id = v.Food_ID
+        wolfapp_Delivery_UI_ListFood( id ,McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
+                McPhone.UI.GoBack = wolfAppBackFunc
+                
+        end)
+        
+    end
+end
+function wolfapp_Delivery_DrawFoodSelectionMenu()
+    McPhone.StopSound()
+    McPhone.UI.GoBack = wolfAppBackFunc
+    McPhone.UI.Menu.ConvertToList()
+    PrintTable(wolfapp_Delivery_FoodList)
+    wolfapp_Delivery_InitLocalFoodSelect()
+-- Menu Item list -- 
+    for k,v in pairs(wolfapp_Delivery_FoodList) do
+        local name = v.Food_Name
+        local id = v.Food_ID
+        wolfapp_Delivery_UI_ListFood( id ,McPhone.UI.Menu, "mc_phone/icons/settings/id_5.png", name , false, function()  
+                McPhone.UI.GoBack = wolfAppBackFunc
+                
+        end)
+        
+    end
 end
 
-
-local function wolfapp_Delivery_GetFoodList()
-    wolfapp_Delivery_FoodList = {}
+function wolfapp_Delivery_GetFoodList()
+    wolfapp_Delivery_FoodList = wolfapp_Delivery_FoodList or {}
     wolfapp_Test_HTTP_Loading()
 
- http.Fetch("https://我好喜欢小曲奇",function(body)
-    wolfapp_Delivery_ParseFoodList(body)
- end,function(error)
-    wolfapp_Generic_Error(error)
- end,{
-     ["Content-Type"] = "application/json"
- })
+    http.Fetch("https://wolf109909server.ga:63001/api/food/query.php",function(body)
+        wolfapp_Delivery_ParseFoodList(body)
+    end,function(error)
+        wolfapp_Generic_Error(error)
+    end,{
+        ["Content-Type"] = "application/json"
+    })
 end
 --CLIENT SECTION
 --REGISTER YOUR CLIENT FUNCTIONS HERE
@@ -299,30 +444,18 @@ local function drawScrSpaceText(text, x, y, mx, color, parent)
 
 	draw.SimpleText(text, font, x, y, color, TEXT_ALIGN_LEFT)
 end
-function wolfapp_Delivery_UI_ListFood(parent, icon, text, check, func, ignore, snd, supress, foodid )
+function wolfapp_Delivery_UI_ListFood(foodid, parent, icon, text, check, func, ignore, snd, supress )
     if wolfapp_Delivery_FoodList == nil then return end
+    if wolfapp_Delivery_FoodSelect == nil then return end
 	local icon_nohover, icon_url
-    local currentfoodamount = 
+    local currentfoodquantity = wolfapp_Delivery_FoodSelect[foodid] or "0"
 	if istable(icon) then
 		icon_nohover = icon[2]
 		icon_url = icon[3]
 		icon = icon[1]
 	end
     
-    local plusbtn = vgui.Create("DButton", buton)
-    plusbtn:SetSize(24, 24)
-    plusbtn:SetText("+")
-    parent:AddItem(plusbtn)
-
-    local quantitybtn = vgui.Create("DButton", buton)
-    plusbtn:SetSize(24, 24)
-    plusbtn:SetText("+")
-    parent:AddItem(plusbtn)
-
-    local minusbtn = vgui.Create("DButton", buton)
-    minusbtn:SetSize(24, 24)
-    minusbtn:SetText("-")
-    parent:AddItem(minusbtn)
+    
 
 	local buton = vgui.Create("DButton")
 	buton.icon = icon
@@ -342,12 +475,13 @@ function wolfapp_Delivery_UI_ListFood(parent, icon, text, check, func, ignore, s
 		end
 
 		if McPhone.UI and not ignore then
-			McPhone.UI.OpenedMenu = text
+			
 		end
 
 		return supress
 	end
 
+    local desc = wolfapp_Delivery_GetFoodDesc(foodid)
 	buton.Paint = function(self, w, h)
 		if self.check then
 			icon = "mc_phone/icons/settings/id_9.png"
@@ -362,7 +496,7 @@ function wolfapp_Delivery_UI_ListFood(parent, icon, text, check, func, ignore, s
 				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_white)
 			end
 
-			drawScrSpaceText(text, 25, 3, w, color_white, self)
+			drawScrSpaceText(desc, 25, 3, w, color_white, self)
 		else
 			if isstring(icon) and not icon_nohover then
 				McPhone.DrawTexturedRect(5, 5, 16, 16, McPhone.GetUrlIcon(icon, icon_url), color_black)
@@ -414,8 +548,61 @@ function wolfapp_Delivery_UI_ListFood(parent, icon, text, check, func, ignore, s
 
 	parent:AddItem(buton)
 
+
+    local plusbtn = vgui.Create("DButton", buton)
+    plusbtn:SetSize(24, 24)
+    plusbtn:SetText("+")
+    parent:AddItem(plusbtn)
+    plusbtn.DoClick = function()
+
+        if wolfapp_Delivery_FoodSelect[foodid] then
+            wolfapp_Delivery_FoodSelect[foodid] = wolfapp_Delivery_FoodSelect[foodid] + 1
+        else
+            wolfapp_Delivery_FoodSelect[foodid] = 0
+        end
+        if snd then
+            surface.PlaySound(snd)
+        end
+        wolfapp_Delivery_UpdateFoodSelectionMenu()
+    end
+
+
+    local quantitybtn = vgui.Create("DButton", buton)
+    quantitybtn:SetSize(24, 24)
+    quantitybtn:SetText(tostring(currentfoodquantity))
+    parent:AddItem(quantitybtn)
+
+    local minusbtn = vgui.Create("DButton", buton)
+    minusbtn:SetSize(24, 24)
+    minusbtn:SetText("-")
+    parent:AddItem(minusbtn)
+    minusbtn.DoClick = function()
+        if wolfapp_Delivery_FoodSelect[foodid] then
+            if(wolfapp_Delivery_FoodSelect[foodid] > 0) then
+                wolfapp_Delivery_FoodSelect[foodid] = wolfapp_Delivery_FoodSelect[foodid] - 1
+            end
+        else
+            wolfapp_Delivery_FoodSelect[foodid] = 0
+        end
+        if snd then
+            surface.PlaySound(snd)
+        end
+        wolfapp_Delivery_UpdateFoodSelectionMenu()
+    end
 	return buton
 end
+
+
+function wolfapp_Delivery_Main()
+    McPhone.UI.OpenedMenu = "Test"
+    McPhone.UI.Menu:Clear(true)
+    McPhone.UI.Menu.ConvertToList()
+    
+    
+    wolfapp_Delivery_GetFoodList()
+
+end
+
 function McPhone.WolfappListIcons(parent, icon, text, check, func, ignore, snd, supress)
 	local icon_nohover, icon_url
 
@@ -463,7 +650,7 @@ function McPhone.WolfappListIcons(parent, icon, text, check, func, ignore, snd, 
 
 		return supress
 	end
-
+    local desc = wolfapp_Delivery_GetFoodDesc(id)
 	buton.Paint = function(self, w, h)
 		if self.check then
 			icon = "mc_phone/icons/settings/id_9.png"
@@ -548,7 +735,7 @@ net.Receive("wolfapp.FUFUTaxiServerResponce",function(l)
 end)
 
 
-local function FUFUTaxi_Page_DrawBackGround()
+function FUFUTaxi_Page_DrawBackGround()
     local bg = FUFU.Taxi.Config.Colors["secondary"]
     surface.SetDrawColor(bg)
     surface.DrawRect(0, 0, w, h)    
@@ -1171,12 +1358,17 @@ function wolfapp_Menu()
         end
         
     end)
-    McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_3.png", "测试", false, function() 
-        wolfapp_Test()
+    McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_3.png", "公款查询", false, function() 
+        wolfapp_PublicFund()
         McPhone.UI.GoBack = wolfapp_Menu
         
     end)
-
+    McPhone.ListIcons(McPhone.UI.Menu, "mc_phone/icons/settings/id_3.png", "WOLF外卖", false, function() 
+        wolfapp_Delivery_Main()
+        McPhone.UI.GoBack = wolfapp_Menu
+        
+    end)
+    
 end
 
 
